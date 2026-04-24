@@ -21,7 +21,7 @@
         </p>
         <div class="hero-actions">
             <a href="{{ url_for('register') }}" class="btn-primary">Create free account</a>
-            <a href="#" class="btn-primary">See how it works</a>
+            <a href="#" class="btn-primary" id="openVideo">See how it works</a>
         </div>
     </div>
     <div class="hero-visual">
@@ -102,4 +102,54 @@
     </div>
 </section>
 
+<div class="modal-overlay" id="videoModal" aria-hidden="true">
+    <div class="modal-box">
+        <button class="modal-close" id="modalClose" aria-label="Close video">✕</button>
+        <div class="modal-video-wrap">
+            <iframe id="modalVideo" src="" frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen></iframe>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const VIDEO_URL = 'https://www.youtube.com/embed/dQw4w9WgXcQ';
+    const modal    = document.getElementById('videoModal');
+    const iframe   = document.getElementById('modalVideo');
+    const openBtn  = document.getElementById('openVideo');
+    const closeBtn = document.getElementById('modalClose');
+
+    function openModal() {
+        iframe.src = VIDEO_URL + '?autoplay=1';
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+        iframe.src = '';
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    openBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        openModal();
+    });
+
+    closeBtn.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeModal();
+    });
+</script>
 {% endblock %}
