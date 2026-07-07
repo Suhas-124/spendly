@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
@@ -143,35 +144,85 @@ def privacy():
 @app.route("/profile")
 @login_required
 def profile():
-    name = session.get("user_name", "User")
+    conn = get_db()
+
+    db_user = conn.execute(
+        "SELECT name, email, created_at FROM users WHERE id = ?",
+        (session["user_id"],),
+    ).fetchone()
+
+    if db_user is None:
+        conn.close()
+        session.clear()
+        return redirect(url_for("login"))
+
+    name = db_user["name"]
     initials = "".join(part[0] for part in name.split()[:2]).upper() or "U"
+    created_at = datetime.strptime(db_user["created_at"], "%Y-%m-%d %H:%M:%S")
     user = {
         "name": name,
-        "email": session.get("user_email", ""),
-        "member_since": "July 2026",
+        "email": db_user["email"],
+        "member_since": created_at.strftime("%B %Y"),
         "initials": initials,
     }
+
+    totals = conn.execute(
+        """
+        SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+        FROM expenses WHERE user_id = ?
+        """,
+        (session["user_id"],),
+    ).fetchone()
+    total_spent = totals["total"]
+
+    top_category_row = conn.execute(
+        """
+        SELECT category FROM expenses WHERE user_id = ?
+        GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1
+        """,
+        (session["user_id"],),
+    ).fetchone()
     stats = {
-        "total_spent": 386.25,
-        "transaction_count": 8,
-        "top_category": "Bills",
+        "total_spent": total_spent,
+        "transaction_count": totals["count"],
+        "top_category": top_category_row["category"] if top_category_row else "—",
     }
+
+    transaction_rows = conn.execute(
+        """
+        SELECT date, description, category, amount FROM expenses
+        WHERE user_id = ? ORDER BY date DESC LIMIT 5
+        """,
+        (session["user_id"],),
+    ).fetchall()
     transactions = [
-        {"date": "22-07-2026", "description": "Restaurant dinner", "category": "Food", "amount": 33.75},
-        {"date": "18-07-2026", "description": "Miscellaneous", "category": "Other", "amount": 10.00},
-        {"date": "15-07-2026", "description": "New shoes", "category": "Shopping", "amount": 80.00},
-        {"date": "12-07-2026", "description": "Movie tickets", "category": "Entertainment", "amount": 25.00},
-        {"date": "08-07-2026", "description": "Pharmacy", "category": "Health", "amount": 60.00},
+        {
+            "date": datetime.strptime(row["date"], "%Y-%m-%d").strftime("%d-%m-%Y"),
+            "description": row["description"],
+            "category": row["category"],
+            "amount": row["amount"],
+        }
+        for row in transaction_rows
     ]
+
+    category_rows = conn.execute(
+        """
+        SELECT category, SUM(amount) AS total FROM expenses
+        WHERE user_id = ? GROUP BY category ORDER BY total DESC
+        """,
+        (session["user_id"],),
+    ).fetchall()
     categories = [
-        {"name": "Bills", "total": 120.00, "percent": 30},
-        {"name": "Shopping", "total": 80.00, "percent": 20},
-        {"name": "Food", "total": 76.25, "percent": 20},
-        {"name": "Health", "total": 60.00, "percent": 15},
-        {"name": "Entertainment", "total": 25.00, "percent": 5},
-        {"name": "Transport", "total": 15.00, "percent": 5},
-        {"name": "Other", "total": 10.00, "percent": 5},
+        {
+            "name": row["category"],
+            "total": row["total"],
+            "percent": round(row["total"] / total_spent * 100) if total_spent else 0,
+        }
+        for row in category_rows
     ]
+
+    conn.close()
+
     return render_template(
         "profile.html",
         user=user,
