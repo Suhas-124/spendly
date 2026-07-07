@@ -1,4 +1,5 @@
 import os
+from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -11,6 +12,15 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-producti
 with app.app_context():
     init_db()
     seed_db()
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("user_id"):
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapped
 
 
 # ------------------------------------------------------------------ #
@@ -115,6 +125,7 @@ def login():
 
     session["user_id"] = user["id"]
     session["user_name"] = user["name"]
+    session["user_email"] = email
 
     return redirect(url_for("profile"))
 
@@ -129,6 +140,47 @@ def privacy():
     return render_template("privacy.html")
 
 
+@app.route("/profile")
+@login_required
+def profile():
+    name = session.get("user_name", "User")
+    initials = "".join(part[0] for part in name.split()[:2]).upper() or "U"
+    user = {
+        "name": name,
+        "email": session.get("user_email", ""),
+        "member_since": "July 2026",
+        "initials": initials,
+    }
+    stats = {
+        "total_spent": 386.25,
+        "transaction_count": 8,
+        "top_category": "Bills",
+    }
+    transactions = [
+        {"date": "22-07-2026", "description": "Restaurant dinner", "category": "Food", "amount": 33.75},
+        {"date": "18-07-2026", "description": "Miscellaneous", "category": "Other", "amount": 10.00},
+        {"date": "15-07-2026", "description": "New shoes", "category": "Shopping", "amount": 80.00},
+        {"date": "12-07-2026", "description": "Movie tickets", "category": "Entertainment", "amount": 25.00},
+        {"date": "08-07-2026", "description": "Pharmacy", "category": "Health", "amount": 60.00},
+    ]
+    categories = [
+        {"name": "Bills", "total": 120.00, "percent": 30},
+        {"name": "Shopping", "total": 80.00, "percent": 20},
+        {"name": "Food", "total": 76.25, "percent": 20},
+        {"name": "Health", "total": 60.00, "percent": 15},
+        {"name": "Entertainment", "total": 25.00, "percent": 5},
+        {"name": "Transport", "total": 15.00, "percent": 5},
+        {"name": "Other", "total": 10.00, "percent": 5},
+    ]
+    return render_template(
+        "profile.html",
+        user=user,
+        stats=stats,
+        transactions=transactions,
+        categories=categories,
+    )
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
@@ -137,11 +189,6 @@ def privacy():
 def logout():
     session.clear()
     return redirect(url_for("landing"))
-
-
-@app.route("/profile")
-def profile():
-    return "Profile page — coming in Step 4"
 
 
 @app.route("/expenses/add")
