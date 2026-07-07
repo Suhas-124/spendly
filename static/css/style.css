@@ -617,6 +617,181 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ------------------------------------------------------------------ */
+/* Profile page                                                        */
+/* ------------------------------------------------------------------ */
+
+.profile-section {
+    padding: 3rem 2rem 5rem;
+}
+
+.profile-inner {
+    max-width: 880px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.profile-card {
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.5rem;
+}
+
+.profile-card-title {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--ink);
+    margin-bottom: 1rem;
+}
+
+.profile-user-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.profile-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.profile-name {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--ink);
+    margin-bottom: 0.2rem;
+}
+
+.profile-email {
+    color: var(--ink-muted);
+    font-size: 0.9rem;
+}
+
+.profile-member-since {
+    color: var(--ink-faint);
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
+
+.profile-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+.stat-card {
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.stat-label { font-size: 0.8rem; color: var(--ink-muted); }
+
+.stat-value {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    color: var(--ink);
+}
+
+.profile-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.profile-table th {
+    text-align: left;
+    color: var(--ink-muted);
+    font-weight: 500;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.6rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.profile-table td {
+    padding: 0.75rem 0.5rem;
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--ink-soft);
+}
+
+.profile-table tr:last-child td { border-bottom: none; }
+
+.profile-amount {
+    font-weight: 500;
+    color: var(--ink);
+    text-align: right;
+}
+
+.category-badge {
+    display: inline-block;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+}
+
+.category-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 80px;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.5rem 0;
+}
+
+.category-name {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    font-weight: 500;
+}
+
+.category-total {
+    font-size: 0.9rem;
+    color: var(--ink);
+    text-align: right;
+}
+
+.category-progress {
+    width: 100%;
+    height: 10px;
+    border: none;
+    border-radius: 999px;
+}
+
+.category-progress::-webkit-progress-bar {
+    background: var(--border-soft);
+    border-radius: 999px;
+}
+
+.category-progress::-webkit-progress-value {
+    background: var(--accent);
+    border-radius: 999px;
+}
+
+.category-progress::-moz-progress-bar {
+    background: var(--accent);
+    border-radius: 999px;
+}
+
+/* ------------------------------------------------------------------ */
 /* Responsive                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -631,4 +806,8 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 600px) {
     .nav-links a:not(.nav-cta) { display: none; }
     .hero { padding: 3rem 1rem 2rem; }
+
+    .profile-user-card { flex-direction: column; align-items: flex-start; }
+    .profile-stats { grid-template-columns: 1fr; }
+    .category-row { grid-template-columns: 90px 1fr 60px; gap: 0.5rem; }
 }
