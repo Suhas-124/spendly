@@ -6,6 +6,7 @@ from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import get_db, init_db, seed_db
+from database.queries import insert_expense
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -25,6 +26,7 @@ def login_required(view):
 
 
 VALID_DATE_RANGES = {"all", "this_month", "last_month", "last_30", "custom"}
+EXPENSE_CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Other"]
 
 
 def _resolve_date_range(selected_range, start_arg, end_arg):
@@ -297,9 +299,62 @@ def logout():
     return redirect(url_for("landing"))
 
 
-@app.route("/expenses/add")
+@app.route("/expenses/add", methods=["GET", "POST"])
+@login_required
 def add_expense():
-    return "Add expense — coming in Step 7"
+    if request.method == "GET":
+        return render_template(
+            "add_expense.html",
+            categories=EXPENSE_CATEGORIES,
+            date=datetime.now().date().isoformat(),
+        )
+
+    amount_raw = request.form.get("amount", "").strip()
+    category = request.form.get("category", "").strip()
+    date_raw = request.form.get("date", "").strip()
+    description = request.form.get("description", "").strip()
+
+    form_values = {
+        "amount": amount_raw,
+        "category": category,
+        "date": date_raw,
+        "description": description,
+    }
+
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        amount = None
+
+    if amount is None or amount <= 0:
+        return render_template(
+            "add_expense.html",
+            categories=EXPENSE_CATEGORIES,
+            error="Please enter a valid amount greater than 0.",
+            **form_values,
+        )
+
+    if category not in EXPENSE_CATEGORIES:
+        return render_template(
+            "add_expense.html",
+            categories=EXPENSE_CATEGORIES,
+            error="Please choose a valid category.",
+            **form_values,
+        )
+
+    try:
+        datetime.strptime(date_raw, "%Y-%m-%d")
+    except ValueError:
+        return render_template(
+            "add_expense.html",
+            categories=EXPENSE_CATEGORIES,
+            error="Please enter a valid date.",
+            **form_values,
+        )
+
+    insert_expense(session["user_id"], amount, category, date_raw, description or None)
+
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/edit")
