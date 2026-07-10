@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
@@ -22,6 +22,41 @@ def login_required(view):
             return redirect(url_for("login"))
         return view(*args, **kwargs)
     return wrapped
+
+
+VALID_DATE_RANGES = {"all", "this_month", "last_month", "last_30", "custom"}
+
+
+def _resolve_date_range(selected_range, start_arg, end_arg):
+    today = datetime.now().date()
+
+    if selected_range == "this_month":
+        start = today.replace(day=1)
+        return start.isoformat(), today.isoformat(), None
+
+    if selected_range == "last_month":
+        first_of_this_month = today.replace(day=1)
+        last_day_prev_month = first_of_this_month - timedelta(days=1)
+        first_day_prev_month = last_day_prev_month.replace(day=1)
+        return first_day_prev_month.isoformat(), last_day_prev_month.isoformat(), None
+
+    if selected_range == "last_30":
+        start = today - timedelta(days=29)
+        return start.isoformat(), today.isoformat(), None
+
+    if selected_range == "custom":
+        if not start_arg or not end_arg:
+            return None, None, "Please choose both a start and end date for a custom range."
+        try:
+            start_dt = datetime.strptime(start_arg, "%Y-%m-%d").date()
+            end_dt = datetime.strptime(end_arg, "%Y-%m-%d").date()
+        except ValueError:
+            return None, None, "That doesn't look like a valid date. Please use the date pickers."
+        if start_dt > end_dt:
+            return None, None, "Start date must be on or before the end date."
+        return start_dt.isoformat(), end_dt.isoformat(), None
+
+    return None, None, None  # "all"
 
 
 # ------------------------------------------------------------------ #
@@ -144,6 +179,16 @@ def privacy():
 @app.route("/profile")
 @login_required
 def profile():
+    raw_range = request.args.get("range", "all")
+    selected_range = raw_range if raw_range in VALID_DATE_RANGES else "all"
+    raw_start = request.args.get("start_date", "")
+    raw_end = request.args.get("end_date", "")
+
+    query_start, query_end, filter_error = _resolve_date_range(selected_range, raw_start, raw_end)
+
+    date_clause = " AND date BETWEEN ? AND ?" if query_start else ""
+    date_params = (query_start, query_end) if query_start else ()
+
     conn = get_db()
 
     db_user = conn.execute(
@@ -167,20 +212,20 @@ def profile():
     }
 
     totals = conn.execute(
-        """
+        f"""
         SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
-        FROM expenses WHERE user_id = ?
+        FROM expenses WHERE user_id = ?{date_clause}
         """,
-        (session["user_id"],),
+        (session["user_id"], *date_params),
     ).fetchone()
     total_spent = totals["total"]
 
     top_category_row = conn.execute(
-        """
-        SELECT category FROM expenses WHERE user_id = ?
+        f"""
+        SELECT category FROM expenses WHERE user_id = ?{date_clause}
         GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1
         """,
-        (session["user_id"],),
+        (session["user_id"], *date_params),
     ).fetchone()
     stats = {
         "total_spent": total_spent,
@@ -189,11 +234,11 @@ def profile():
     }
 
     transaction_rows = conn.execute(
-        """
+        f"""
         SELECT date, description, category, amount FROM expenses
-        WHERE user_id = ? ORDER BY date DESC LIMIT 5
+        WHERE user_id = ?{date_clause} ORDER BY date DESC LIMIT 5
         """,
-        (session["user_id"],),
+        (session["user_id"], *date_params),
     ).fetchall()
     transactions = [
         {
@@ -206,11 +251,11 @@ def profile():
     ]
 
     category_rows = conn.execute(
-        """
+        f"""
         SELECT category, SUM(amount) AS total FROM expenses
-        WHERE user_id = ? GROUP BY category ORDER BY total DESC
+        WHERE user_id = ?{date_clause} GROUP BY category ORDER BY total DESC
         """,
-        (session["user_id"],),
+        (session["user_id"], *date_params),
     ).fetchall()
     categories = [
         {
@@ -229,6 +274,10 @@ def profile():
         stats=stats,
         transactions=transactions,
         categories=categories,
+        selected_range=selected_range,
+        start_date=raw_start,
+        end_date=raw_end,
+        filter_error=filter_error,
     )
 
 
