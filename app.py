@@ -1,12 +1,13 @@
+import math
 import os
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, abort, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import get_db, init_db, seed_db
-from database.queries import insert_expense
+from database.queries import get_expense, insert_expense, update_expense
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -59,6 +60,44 @@ def _resolve_date_range(selected_range, start_arg, end_arg):
         return start_dt.isoformat(), end_dt.isoformat(), None
 
     return None, None, None  # "all"
+
+
+def _validate_expense_form(form):
+    amount_raw = form.get("amount", "").strip()
+    category = form.get("category", "").strip()
+    date_raw = form.get("date", "").strip()
+    description = form.get("description", "").strip()
+
+    form_values = {
+        "amount": amount_raw,
+        "category": category,
+        "date": date_raw,
+        "description": description,
+    }
+
+    try:
+        amount = float(amount_raw)
+    except ValueError:
+        amount = None
+
+    if amount is None or amount <= 0:
+        return None, form_values, "Please enter a valid amount greater than 0."
+
+    if category not in EXPENSE_CATEGORIES:
+        return None, form_values, "Please choose a valid category."
+
+    try:
+        datetime.strptime(date_raw, "%Y-%m-%d")
+    except ValueError:
+        return None, form_values, "Please enter a valid date."
+
+    validated = {
+        "amount": amount,
+        "category": category,
+        "date": date_raw,
+        "description": description or None,
+    }
+    return validated, form_values, None
 
 
 # ------------------------------------------------------------------ #
@@ -222,6 +261,15 @@ def profile():
     ).fetchone()
     total_spent = totals["total"]
 
+    PAGE_SIZE = 10
+    total_pages = max(1, math.ceil(totals["count"] / PAGE_SIZE))
+    try:
+        page = int(request.args.get("page", "1"))
+    except ValueError:
+        page = 1
+    page = min(max(page, 1), total_pages)
+    offset = (page - 1) * PAGE_SIZE
+
     top_category_row = conn.execute(
         f"""
         SELECT category FROM expenses WHERE user_id = ?{date_clause}
@@ -237,13 +285,14 @@ def profile():
 
     transaction_rows = conn.execute(
         f"""
-        SELECT date, description, category, amount FROM expenses
-        WHERE user_id = ?{date_clause} ORDER BY date DESC LIMIT 5
+        SELECT id, date, description, category, amount FROM expenses
+        WHERE user_id = ?{date_clause} ORDER BY date DESC LIMIT ? OFFSET ?
         """,
-        (session["user_id"], *date_params),
+        (session["user_id"], *date_params, PAGE_SIZE, offset),
     ).fetchall()
     transactions = [
         {
+            "id": row["id"],
             "date": datetime.strptime(row["date"], "%Y-%m-%d").strftime("%d-%m-%Y"),
             "description": row["description"],
             "category": row["category"],
@@ -280,6 +329,8 @@ def profile():
         start_date=raw_start,
         end_date=raw_end,
         filter_error=filter_error,
+        page=page,
+        total_pages=total_pages,
     )
 
 
@@ -309,57 +360,63 @@ def add_expense():
             date=datetime.now().date().isoformat(),
         )
 
-    amount_raw = request.form.get("amount", "").strip()
-    category = request.form.get("category", "").strip()
-    date_raw = request.form.get("date", "").strip()
-    description = request.form.get("description", "").strip()
-
-    form_values = {
-        "amount": amount_raw,
-        "category": category,
-        "date": date_raw,
-        "description": description,
-    }
-
-    try:
-        amount = float(amount_raw)
-    except ValueError:
-        amount = None
-
-    if amount is None or amount <= 0:
+    validated, form_values, error = _validate_expense_form(request.form)
+    if error:
         return render_template(
             "add_expense.html",
             categories=EXPENSE_CATEGORIES,
-            error="Please enter a valid amount greater than 0.",
+            error=error,
             **form_values,
         )
 
-    if category not in EXPENSE_CATEGORIES:
-        return render_template(
-            "add_expense.html",
-            categories=EXPENSE_CATEGORIES,
-            error="Please choose a valid category.",
-            **form_values,
-        )
-
-    try:
-        datetime.strptime(date_raw, "%Y-%m-%d")
-    except ValueError:
-        return render_template(
-            "add_expense.html",
-            categories=EXPENSE_CATEGORIES,
-            error="Please enter a valid date.",
-            **form_values,
-        )
-
-    insert_expense(session["user_id"], amount, category, date_raw, description or None)
+    insert_expense(
+        session["user_id"],
+        validated["amount"],
+        validated["category"],
+        validated["date"],
+        validated["description"],
+    )
 
     return redirect(url_for("profile"))
 
 
-@app.route("/expenses/<int:id>/edit")
+@app.route("/expenses/<int:id>/edit", methods=["GET", "POST"])
+@login_required
 def edit_expense(id):
-    return "Edit expense — coming in Step 8"
+    expense = get_expense(id, session["user_id"])
+    if expense is None:
+        abort(404)
+
+    if request.method == "GET":
+        return render_template(
+            "edit_expense.html",
+            categories=EXPENSE_CATEGORIES,
+            expense_id=expense["id"],
+            amount=expense["amount"],
+            category=expense["category"],
+            date=expense["date"],
+            description=expense["description"],
+        )
+
+    validated, form_values, error = _validate_expense_form(request.form)
+    if error:
+        return render_template(
+            "edit_expense.html",
+            categories=EXPENSE_CATEGORIES,
+            expense_id=expense["id"],
+            error=error,
+            **form_values,
+        )
+
+    update_expense(
+        id,
+        validated["amount"],
+        validated["category"],
+        validated["date"],
+        validated["description"],
+    )
+
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/delete")
