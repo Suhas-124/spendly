@@ -67,7 +67,7 @@
 
         <div class="profile-card">
             <div class="profile-card-header">
-                <h2 class="profile-card-title">Recent Transactions</h2>
+                <h2 class="profile-card-title">Transactions</h2>
                 <a href="{{ url_for('add_expense') }}" class="btn-primary">Add Expense</a>
             </div>
             <table class="profile-table">
@@ -77,6 +77,7 @@
                         <th>Description</th>
                         <th>Category</th>
                         <th>Amount</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -86,10 +87,29 @@
                         <td>{{ tx.description }}</td>
                         <td><span class="category-badge">{{ tx.category }}</span></td>
                         <td class="profile-amount">₹{{ "%.2f"|format(tx.amount) }}</td>
+                        <td><a href="{{ url_for('edit_expense', id=tx.id) }}" class="btn-ghost">Edit</a></td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                {% if page > 1 %}
+                <a href="{{ url_for('profile', page=page-1, range=selected_range, start_date=start_date, end_date=end_date) }}" class="btn-ghost">Previous</a>
+                {% else %}
+                <span class="btn-ghost pagination-disabled">Previous</span>
+                {% endif %}
+
+                <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
+
+                {% if page < total_pages %}
+                <a href="{{ url_for('profile', page=page+1, range=selected_range, start_date=start_date, end_date=end_date) }}" class="btn-ghost">Next</a>
+                {% else %}
+                <span class="btn-ghost pagination-disabled">Next</span>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
 
         <div class="profile-card">
