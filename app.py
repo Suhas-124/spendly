@@ -7,6 +7,7 @@ from flask import Flask, abort, redirect, render_template, request, session, url
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import get_db, init_db, seed_db
+from database.queries import delete_expense as delete_expense_row
 from database.queries import get_expense, insert_expense, update_expense
 
 app = Flask(__name__)
@@ -419,9 +420,16 @@ def edit_expense(id):
     return redirect(url_for("profile"))
 
 
-@app.route("/expenses/<int:id>/delete")
+@app.route("/expenses/<int:id>/delete", methods=["POST"])
+@login_required
 def delete_expense(id):
-    return "Delete expense — coming in Step 9"
+    expense = get_expense(id, session["user_id"])
+    if expense is None:
+        abort(404)
+
+    delete_expense_row(id)
+
+    return redirect(url_for("profile"))
 
 
 if __name__ == "__main__":

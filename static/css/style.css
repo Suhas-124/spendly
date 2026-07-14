@@ -357,6 +357,24 @@ a { color: inherit; text-decoration: none; }
     color: var(--ink);
 }
 
+.btn-danger {
+    display: inline-block;
+    background: transparent;
+    color: var(--danger);
+    padding: 0.65rem 1.5rem;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    border: 1px solid var(--danger);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-danger:hover {
+    background: var(--danger-light);
+}
+
 /* ------------------------------------------------------------------ */
 /* Features section                                                    */
 /* ------------------------------------------------------------------ */
@@ -744,6 +762,22 @@ a { color: inherit; text-decoration: none; }
 }
 
 .profile-table tr:last-child td { border-bottom: none; }
+
+.profile-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.profile-actions form {
+    display: inline;
+}
+
+.profile-actions .btn-ghost,
+.profile-actions .btn-danger {
+    padding: 0.4rem 0.9rem;
+    font-size: 0.8rem;
+}
 
 .pagination {
     display: flex;
